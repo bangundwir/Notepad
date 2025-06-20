@@ -1,5 +1,9 @@
-// Google Docs API Service
-const API_URL = 'https://script.google.com/macros/s/AKfycbwIM4JH00OkFVc6EzNFj7wmxObDZl8OyvyWN4vSeJa8jGBacazuubmE1XEHu2JPGazr/exec';
+// Google Docs API Service - Production Version with Environment Variables
+const API_URL = import.meta.env.VITE_GOOGLE_DOCS_API_URL;
+
+if (!API_URL) {
+  console.error('VITE_GOOGLE_DOCS_API_URL not found in environment variables');
+}
 
 export interface ApiResponse {
   success: boolean;
@@ -23,15 +27,45 @@ class GoogleDocsApiService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = API_URL;
+    this.baseUrl = API_URL || '';
   }
 
   /**
-   * Test API connection
+   * Enhanced fetch with better CORS handling - avoid preflight when possible
+   */
+  private async safeFetch(url: string, options: RequestInit = {}, retries: number = 3): Promise<Response> {
+    for (let i = 0; i < retries; i++) {
+      try {
+        const response = await fetch(url, options);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        return response;
+      } catch (error) {
+        if (i === retries - 1) throw error;
+        
+        // Wait before retry (exponential backoff)
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+      }
+    }
+    
+    throw new Error('Max retries exceeded');
+  }
+
+  /**
+   * Test API connection with simple GET request (no preflight)
    */
   async ping(): Promise<ApiResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}?action=ping`);
+      const url = `${this.baseUrl}?action=ping&t=${Date.now()}`;
+      
+      const response = await this.safeFetch(url, {
+        method: 'GET',
+        mode: 'cors'
+      });
+      
       const data = await response.json();
       return data;
     } catch (error) {
@@ -44,11 +78,17 @@ class GoogleDocsApiService {
   }
 
   /**
-   * Get document content
+   * Get document content with simple GET request (no preflight)
    */
   async getContent(): Promise<DocumentContent | null> {
     try {
-      const response = await fetch(`${this.baseUrl}?action=get`);
+      const url = `${this.baseUrl}?action=get&t=${Date.now()}`;
+      
+      const response = await this.safeFetch(url, {
+        method: 'GET',
+        mode: 'cors'
+      });
+      
       const data: ApiResponse = await response.json();
       
       if (data.success && data.content !== undefined) {
@@ -62,25 +102,28 @@ class GoogleDocsApiService {
       
       throw new Error(data.message || 'Failed to get content');
     } catch (error) {
-      console.error('Error getting content:', error);
       return null;
     }
   }
 
   /**
-   * Replace entire document content
+   * Save content using form-encoded POST to avoid preflight
    */
   async saveContent(content: string): Promise<ApiResponse> {
     try {
-      const response = await fetch(this.baseUrl, {
+      // Use form-encoded data to avoid CORS preflight
+      const formData = new URLSearchParams();
+      formData.append('action', 'replace');
+      formData.append('content', content);
+      formData.append('timestamp', new Date().toISOString());
+      
+      const response = await this.safeFetch(this.baseUrl, {
         method: 'POST',
+        mode: 'cors',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({
-          action: 'replace',
-          content: content
-        })
+        body: formData.toString()
       });
       
       const data: ApiResponse = await response.json();
@@ -95,20 +138,24 @@ class GoogleDocsApiService {
   }
 
   /**
-   * Append text to document
+   * Append text using form-encoded POST to avoid preflight
    */
   async appendText(text: string, style: string = 'NORMAL'): Promise<ApiResponse> {
     try {
-      const response = await fetch(this.baseUrl, {
+      // Use form-encoded data to avoid CORS preflight
+      const formData = new URLSearchParams();
+      formData.append('action', 'append');
+      formData.append('text', text);
+      formData.append('style', style);
+      formData.append('timestamp', new Date().toISOString());
+      
+      const response = await this.safeFetch(this.baseUrl, {
         method: 'POST',
+        mode: 'cors',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({
-          action: 'append',
-          text: text,
-          style: style
-        })
+        body: formData.toString()
       });
       
       const data: ApiResponse = await response.json();
@@ -123,20 +170,24 @@ class GoogleDocsApiService {
   }
 
   /**
-   * Add log entry
+   * Add log entry using form-encoded POST to avoid preflight
    */
   async addLog(level: 'INFO' | 'WARNING' | 'ERROR' | 'LOG', message: string): Promise<ApiResponse> {
     try {
-      const response = await fetch(this.baseUrl, {
+      // Use form-encoded data to avoid CORS preflight
+      const formData = new URLSearchParams();
+      formData.append('action', 'log');
+      formData.append('level', level);
+      formData.append('message', message);
+      formData.append('timestamp', new Date().toISOString());
+      
+      const response = await this.safeFetch(this.baseUrl, {
         method: 'POST',
+        mode: 'cors',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: JSON.stringify({
-          action: 'log',
-          level: level,
-          message: message
-        })
+        body: formData.toString()
       });
       
       const data: ApiResponse = await response.json();
@@ -199,23 +250,16 @@ class GoogleDocsApiService {
 
         this.isSaving = true;
         this.lastSaveTime = Date.now();
-        
+
         try {
           const result = await this.saveContent(content);
-          
-          // Smart logging - only log significant saves
-          if (immediate || contentLength > 50) {
-            await this.addLog('INFO', `Smart-sync: ${contentLength} chars (${priority} priority)`);
-          }
-          
           resolve(result);
         } catch (error) {
-          const errorResult: ApiResponse = {
+          resolve({
             success: false,
-            message: `Smart-sync error: ${error}`,
+            message: 'Sync failed: ' + (error instanceof Error ? error.message : 'Unknown error'),
             error: error instanceof Error ? error.message : 'Unknown error'
-          };
-          resolve(errorResult);
+          });
         } finally {
           this.isSaving = false;
         }
@@ -224,24 +268,25 @@ class GoogleDocsApiService {
   }
 
   /**
-   * Cancel pending sync
+   * Cancel pending sync operations
    */
   cancelSync(): void {
     if (this.saveTimeout) {
       clearTimeout(this.saveTimeout);
       this.saveTimeout = null;
     }
+    this.isSaving = false;
   }
 
   /**
-   * Legacy auto-save method (for backwards compatibility)
+   * Auto-save functionality with debouncing
    */
   async autoSave(content: string, _delay: number = 2000): Promise<void> {
     await this.smartSync(content, { priority: 'normal' });
   }
 
   /**
-   * Cancel pending auto-save (legacy)
+   * Cancel auto-save
    */
   cancelAutoSave(): void {
     this.cancelSync();

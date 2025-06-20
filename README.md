@@ -1,149 +1,176 @@
-# Google Docs Notepad - Real-time Editor
+# Google Docs Notepad
 
-A modern, real-time notepad application that syncs with Google Docs using Google Apps Script API.
+Aplikasi notepad real-time yang terhubung dengan Google Docs melalui Google Apps Script API.
 
-## 🚀 Features
+## ✨ Fitur Utama
 
-- **Real-time Sync**: All changes automatically sync to Google Docs
-- **Auto-save**: Content saves every 2 seconds automatically
-- **Manual Save**: Press `Ctrl+S` for instant save
-- **Connection Status**: Visual indicators for connection and save status
-- **Modern UI**: Dark theme with monospace font (JetBrains Mono)
-- **Live Character Count**: Real-time character and word counting
-- **Error Handling**: Graceful handling of connection issues
-
-## 🛠 Tech Stack
-
-- **Frontend**: React 18 + TypeScript + Vite
-- **Styling**: Tailwind CSS
-- **Icons**: Lucide React
-- **Backend**: Google Apps Script (Google Docs API)
-- **Real-time**: RESTful API with auto-save functionality
-
-## 📋 Prerequisites
-
-- Node.js 18+ 
-- npm or yarn
-- Access to Google Apps Script API (already configured)
+- 📝 **Real-time Sync** - Otomatis menyimpan ke Google Docs
+- 🌐 **CORS-Free** - Menggunakan form-encoded POST untuk menghindari preflight
+- 🔒 **Environment Variables** - API URL disimpan dengan aman
+- 📱 **Responsive Design** - Optimized untuk desktop dan mobile
+- ⚡ **Smart Batching** - Intelligent save timing untuk performa optimal
 
 ## 🚀 Quick Start
 
-1. **Install dependencies**:
-   ```bash
-   npm install
-   ```
+### 1. Clone Repository
+```bash
+git clone https://github.com/bangundwir/Notepad.git
+cd notepad
+```
 
-2. **Start development server**:
-   ```bash
-   npm run dev
-   ```
+### 2. Setup Environment
+```bash
+# Copy environment template
+cp .env.example .env
 
-3. **Open your browser**:
-   Navigate to `http://localhost:5173`
+# Edit .env file dan masukkan Google Apps Script URL Anda
+nano .env
+```
 
-## 🔗 API Integration
+### 3. Install Dependencies
+```bash
+npm install
+```
 
-The application connects to a Google Apps Script API with the following endpoints:
+### 4. Start Development Server
+```bash
+npm run dev
+```
 
-- `GET /exec?action=ping` - Test connection
-- `GET /exec?action=get` - Retrieve document content  
-- `POST /exec` with `action=replace` - Save entire content
-- `POST /exec` with `action=append` - Append new content
-- `POST /exec` with `action=log` - Add log entries
+## 🔧 Setup Google Apps Script
 
-## ⌨️ Keyboard Shortcuts
+### 1. Buat Google Apps Script Project
+1. Buka [Google Apps Script](https://script.google.com)
+2. Buat project baru
+3. Copy code dari `appscript/code.gs`
+4. Paste ke Apps Script editor
 
-- `Ctrl+S` - Manual save
-- Standard text editing shortcuts supported
+### 2. Deploy as Web App
+1. Klik **Deploy** > **New deployment**
+2. Pilih type: **Web app**
+3. Execute as: **Me**
+4. Who has access: **Anyone**
+5. Click **Deploy**
+6. Copy URL yang diberikan
 
-## 🎨 Features Overview
+### 3. Update Environment Variable
+```bash
+# Edit .env file
+VITE_GOOGLE_DOCS_API_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
+```
 
-### Connection Status Indicators
-- 🟢 **Connected** - Ready to sync
-- 🟡 **Connecting** - Establishing connection
-- 🔵 **Saving** - Writing to Google Docs
-- 🔴 **Error** - Connection or save failed
+### 4. Setup Google Document
+1. Buat Google Document baru
+2. Copy Document ID dari URL
+3. Update `DOCUMENT_ID` di `appscript/code.gs`
+4. Re-deploy Apps Script
 
-### Auto-save Functionality
-- Debounced auto-save (2-second delay)
-- Visual feedback for unsaved changes
-- Automatic retry on connection recovery
+## 🐛 Troubleshooting CORS
 
-### Real-time Updates
-- Character count tracking
-- Last save timestamp
-- Document metadata display
+### Masalah CORS Sebelumnya
+```
+Access to fetch from origin 'http://localhost:5173' has been blocked by CORS policy
+```
 
-## 🏗 Project Structure
+### Solusi yang Diterapkan
+
+1. **Form-Encoded POST**: Menggunakan `application/x-www-form-urlencoded` instead of JSON untuk menghindari preflight requests
+2. **Proper CORS Headers**: Apps Script mengirim header CORS yang benar
+3. **OPTIONS Handler**: Menangani preflight requests dengan benar
+4. **Environment Variables**: API URL disimpan dengan aman
+
+### Test CORS Fix
+Buka `test-cors-fix.html` di browser untuk test manual:
+```
+http://localhost:5173/test-cors-fix.html
+```
+
+## 📁 Structure
 
 ```
 notepad/
 ├── src/
 │   ├── components/
-│   │   └── Notepad.tsx          # Main editor component
+│   │   └── Notepad.tsx          # Main notepad component
 │   ├── services/
-│   │   └── googleDocsApi.ts     # API service layer
-│   ├── App.tsx                  # Root component
-│   ├── index.css               # Global styles
-│   └── main.tsx                # Entry point
-├── public/
-└── package.json
+│   │   └── googleDocsApi.ts     # API service dengan CORS fix
+│   └── main.tsx
+├── appscript/
+│   └── code.gs                  # Google Apps Script code
+├── .env                         # Environment variables (not in git)
+├── .env.example                 # Environment template
+└── test-cors-fix.html          # Manual CORS test
 ```
 
-## 🔧 Configuration
+## 🔒 Security Notes
 
-The API endpoint is configured in `src/services/googleDocsApi.ts`:
+- File `.env` tidak di-track di git untuk keamanan
+- API URL disimpan sebagai environment variable
+- Google Apps Script hanya menerima request dari domain yang authorized
 
-```typescript
-const API_URL = 'https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec';
-```
+## 🚀 Production Deployment
 
-## 🐛 Troubleshooting
-
-### Connection Issues
-- Check internet connection
-- Verify API endpoint is accessible
-- Check browser console for errors
-
-### Save Issues  
-- Ensure you have write permissions to the Google Doc
-- Check if the document ID is correct
-- Verify Google Apps Script is deployed properly
-
-## 📦 Build for Production
-
+### Build for Production
 ```bash
 npm run build
 ```
 
-This creates an optimized build in the `dist/` folder.
+### Environment Variables for Production
+Update production environment dengan:
+```bash
+VITE_GOOGLE_DOCS_API_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
+```
 
-## 🤝 Contributing
+## 📱 Mobile Support
 
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
+- Optimized untuk iOS dan Android
+- Prevents zoom pada input fields
+- Touch-friendly interface
+- Responsive design dengan Tailwind CSS
+
+## ⚡ Performance Features
+
+- **Smart Sync**: Intelligent batching based pada content size
+- **Debounced Saves**: Prevents excessive API calls
+- **Retry Logic**: Automatic retry dengan exponential backoff
+- **Background Sync**: Non-blocking save operations
+
+## 🛠 Development
+
+### Available Scripts
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run preview  # Preview production build
+npm run lint     # Run ESLint
+```
+
+### Tech Stack
+- **Frontend**: React 19 + TypeScript + Vite
+- **Styling**: Tailwind CSS v4
+- **Backend**: Google Apps Script
+- **Storage**: Google Docs
 
 ## 📄 License
 
-This project is open source and available under the MIT License.
+MIT License - lihat file LICENSE untuk detail
 
-## 🌟 Demo
+## 🤝 Contributing
 
-The application provides a seamless notepad experience with:
-- Instant feedback on typing
-- Visual save confirmations
-- Persistent storage in Google Docs
-- Professional dark theme interface
+1. Fork repository
+2. Create feature branch
+3. Commit changes
+4. Push to branch
+5. Create Pull Request
 
-Perfect for:
-- 📝 Note-taking
-- 💻 Code snippets  
-- 📄 Document drafting
-- 🎯 Real-time collaboration preparation
+## 📞 Support
+
+Jika mengalami masalah:
+1. Check console untuk error messages
+2. Test dengan `test-cors-fix.html`
+3. Verify Google Apps Script deployment
+4. Check environment variables
 
 ---
 
-**Built with ❤️ using React, TypeScript, and Google Apps Script**
+**Note**: Pastikan Google Apps Script sudah di-deploy dengan permissions yang benar dan Document ID sudah diupdate sesuai Google Document yang akan digunakan.
